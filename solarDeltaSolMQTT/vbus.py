@@ -8,6 +8,7 @@ import time
 import struct
 import logging
 import paho.mqtt.client as mqtt
+from .moving_average import Moving_Average
 
 V1 = 0x10
 V2 = 0x20
@@ -24,7 +25,7 @@ class DeltaSol_BS_Plus():
                   ('HeatQuantity_MWh', 'Version', '=HH')
                   )
 
-    def __init__(self, device, temperature_diff=0.2):
+    def __init__(self, device, temperature_diff=0.2, temperature_avg_samples=5):
         self._device = device
         self.temperature_diff = temperature_diff
         self._conn = None
@@ -34,9 +35,13 @@ class DeltaSol_BS_Plus():
             self._names += v[:-1]
 
         self.S1 = None
+        self.S1_ma = Moving_Average(temperature_avg_samples)
         self.S2 = None
+        self.S2_ma = Moving_Average(temperature_avg_samples)
         self.S3 = None
+        self.S3_ma = Moving_Average(temperature_avg_samples)
         self.S4 = None
+        self.S4_ma = Moving_Average(temperature_avg_samples)
         self.SpeedRelay1 = None
         self.SpeedRelay2 = None
         self.Relaymask = None
@@ -106,6 +111,9 @@ class DeltaSol_BS_Plus():
 
                                 if is_temperature:
                                     value = value * 0.1
+                                    ma = self.__dict__.get(key + '_ma')
+                                    ma.feed(value * 0.1)
+                                    value = ma.get_avg()
 
                                 logging.debug(
                                     "key=%s value=%s old=%s", key, value, old)
