@@ -1,0 +1,14 @@
+---
+solar:
+  device: /dev/ttyUSB1
+mqtt:
+  host: 127.0.0.1
+  port: 1883
+  prefix: solar
+publish:
+  S1: collector/temperature
+  S2: boiler-bottom/temperature
+  S3: boiler-top/temperature
+  S4: return/temperature
+  SpeedRelay1: pump/speed
+  Errormask: true
