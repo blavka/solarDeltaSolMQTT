@@ -1,0 +1,13 @@
+language: python
+python: 3.7
+script:
+- "./test.sh"
+- "./build.sh"
+deploy:
+  provider: pypi
+  skip_cleanup: true
+  user: blavka
+  on:
+    tags: true
+  password:
+    secure: EHcA/6EBhcnr6kwBq2SbU8OnDJVkLtGnB5M2X0cEhqgiMw27ZjQP3B1TK0xPjg40w4L4RYvHIH0GL5AQsj+Ou/FTX/fWBLef0zR3c1dXd3+mypL/0X2PWXmtfHbYp/zCBRIJrnmMPdBTrfppd6i9cgIOa+oqMmBXbr/Ax1i/rafU1YKBonCsQlHxKQugihkfMYicnxrBhIrRPzHCNVDL1qyAPE6fjIIqYSqdFZde6dEgWKHl/4Cx8co6HZQIn+j3BMs6UhgqYXMBXgpXyuM/sJ7T1hRIY44s7c22IK8Rzxu6xODqurTf80A712QcjeVbP/f2pxnLiOv3hWQwkdZ9mjRifwpRe+hoSrimAlIx5KXjPsAuzA6+maIw1Sxyd5LvRuRKy1Q1RYh1Z1cHmh4JVvOIdDk0f13MwObKI6oKlvTsGb+mapGha8EsspEfOKoG212fafDBZkGh7K33qOPEDB4CJQxAJKg6hmODENVAw6C65LZVh6+XjXpAEt93sazZ3S2a1sZXA4Sp6H0E5LxFX3IRbBbl8t0TeE7fTXJNtMJfy5C5gN8+CB+hs3LX/Es+IZmp2zgHa96kkB86xT1ELpCN1ZnCLJ2gG1ZAesI8QU40qSgLduOekiVtIszb+KIVyAUEL1QZ0jrAAet6jOCDzjE0f1JgjaEgFf44NvKnv9w=
