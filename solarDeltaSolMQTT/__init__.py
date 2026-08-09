@@ -9,7 +9,7 @@ from .mqtt_client import MqttClient
 from .config import load_config
 from .vbus import DeltaSol_BS_Plus
 
-__version__ = '0.0.0'
+__version__ = '0.1.0'
 
 
 @click.command()

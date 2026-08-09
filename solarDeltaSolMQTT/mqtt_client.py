@@ -13,7 +13,9 @@ class MqttClient:
     def __init__(self, host, port, username=None, password=None, cafile=None, certfile=None, keyfile=None, prefix=None):
         port = int(port)
 
-        self.mqttc = paho.mqtt.client.Client()
+        self.mqttc = paho.mqtt.client.Client(
+            callback_api_version=paho.mqtt.client.CallbackAPIVersion.VERSION2
+        )
         self.mqttc.on_connect = self._mqtt_on_connect
         self.mqttc.on_message = self._mqtt_on_message
         self.mqttc.on_disconnect = self._mqtt_on_disconnect
@@ -48,23 +50,15 @@ class MqttClient:
         self._loop_start = True
         self.mqttc.loop_forever()
 
-    def _mqtt_on_connect(self, client, userdata, flags, rc):
-        logging.info('Connected to MQTT broker with code %s', rc)
+    def _mqtt_on_connect(self, client, userdata, connect_flags, reason_code, properties):
+        logging.info('Connected to MQTT broker with reason code %s', reason_code)
 
-        lut = {paho.mqtt.client.CONNACK_REFUSED_PROTOCOL_VERSION: 'incorrect protocol version',
-               paho.mqtt.client.CONNACK_REFUSED_IDENTIFIER_REJECTED: 'invalid client identifier',
-               paho.mqtt.client.CONNACK_REFUSED_SERVER_UNAVAILABLE: 'server unavailable',
-               paho.mqtt.client.CONNACK_REFUSED_BAD_USERNAME_PASSWORD: 'bad username or password',
-               paho.mqtt.client.CONNACK_REFUSED_NOT_AUTHORIZED: 'not authorised'}
+        if reason_code != 0:
+            logging.error('Connection refused from reason: %s', reason_code)
 
-        if rc != paho.mqtt.client.CONNACK_ACCEPTED:
-            logging.error('Connection refused from reason: %s', lut.get(rc, 'unknown code'))
-
-        if rc == paho.mqtt.client.CONNACK_ACCEPTED:
-            pass
-
-    def _mqtt_on_disconnect(self, client, userdata, rc):
-        logging.info('Disconnect from MQTT broker with code %s', rc)
+    def _mqtt_on_disconnect(
+            self, client, userdata, disconnect_flags, reason_code, properties):
+        logging.info('Disconnect from MQTT broker with reason code %s', reason_code)
 
     def _mqtt_on_message(self, client, userdata, message):
         logging.debug('mqtt_on_message %s %s', message.topic, message.payload)

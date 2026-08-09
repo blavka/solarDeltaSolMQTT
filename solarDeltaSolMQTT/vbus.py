@@ -60,6 +60,17 @@ class DeltaSol_BS_Plus():
 
         self.on_change = None
 
+    def normalize_value(self, key, value):
+        """Convert a raw controller value and update its moving average if needed."""
+        is_temperature = key.startswith('S') and len(key) == 2
+        if not is_temperature:
+            return value
+
+        value *= 0.1
+        moving_average = getattr(self, key + '_ma')
+        moving_average.feed(value)
+        return moving_average.get_avg()
+
     def calc_crc(self, buffer):
         Crc = 0x7F
         for char in buffer:
@@ -108,12 +119,7 @@ class DeltaSol_BS_Plus():
                                 old = self.__dict__.get(key, None)
 
                                 is_temperature = key[0] == 'S' and len(key) == 2
-
-                                if is_temperature:
-                                    value = value * 0.1
-                                    ma = self.__dict__.get(key + '_ma')
-                                    ma.feed(value * 0.1)
-                                    value = ma.get_avg()
+                                value = self.normalize_value(key, value)
 
                                 logging.debug(
                                     "key=%s value=%s old=%s", key, value, old)

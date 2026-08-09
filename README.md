@@ -7,10 +7,13 @@
 
 ## Installing
 
-You can install **solarDeltaSolMQTT** directly from PyPI:
+Requires Python 3.10 or newer. Until the next PyPI release, install from a checkout:
 
 ```sh
-sudo pip3 install -U solarDeltaSolMQTT
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install .
 ```
 
 ## Config
