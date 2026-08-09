@@ -38,11 +38,6 @@ if [ ! -f "$VENV_DIR/bin/python3" ]; then
 			'TIP: If you are using Debian-based distro, run "apt-get install python3-venv".'
 	fi
 
-	if ! "$pybin" -c 'import pip' 2>/dev/null; then
-		die 'Python module pip is not installed!',
-			'TIP: If you are using Debian-based distro, run "apt-get install python3-pip".'
-	fi
-
 	"$pybin" -m venv "$VENV_DIR"
 fi
 
@@ -50,12 +45,16 @@ export PATH="$VENV_DIR/bin:$PATH"
 unset PYTHONHOME
 
 einfo 'Installing Python modules...'
-python3 -m pip install -r requirements-dev.txt 2>&1 \
-	| sed -e '/^Requirement already satisfied/d' \
-		-e '/don.t match your environment$/d'
+if python3 -c 'import pip' 2>/dev/null; then
+	python3 -m pip install -r requirements-dev.txt 2>&1 \
+		| sed -e '/^Requirement already satisfied/d' \
+			-e '/don.t match your environment$/d'
+elif command -v uv >/dev/null 2>&1; then
+	uv pip install --python "$VENV_DIR/bin/python3" -r requirements-dev.txt
+else
+	die 'Python module pip is not available in the virtual environment.', \
+		'TIP: Install python3-venv, or install uv and run this script again.'
+fi
 
-einfo 'Test codestyle'
-python3 -m pycodestyle --ignore=E501 --exclude .venv .
-
-einfo 'Test setup.py'
-python3 setup.py test
+einfo 'Run tests'
+python3 -m unittest discover -v

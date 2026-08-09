@@ -5,6 +5,7 @@
 '''
 @author: karel.blavka@gmail.com
 '''
+import copy
 import os
 import sys
 import logging
@@ -72,7 +73,7 @@ def load_config(config_file):
 def _apply_default(config, default):
     for key in default:
         if key not in config:
-            config[key] = default[key]
+            config[key] = copy.deepcopy(default[key])
             continue
 
         if isinstance(default[key], dict):
