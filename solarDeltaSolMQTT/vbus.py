@@ -19,7 +19,7 @@ class DeltaSol_BS_Plus():
     def_frames = (('S1', 'S2', '=HH'),
                   ('S3', 'S4', '=HH'),
                   ('SpeedRelay1', 'SpeedRelay2', 'Relaymask', 'Errormask', '=BBBB'),
-                  ('SystemTime', 'Scheme', 'OptionsMas', '=HBB'),
+                  ('SystemTime', 'Scheme', 'OptionsMask', '=HBB'),
                   ('RuntimeRelay1', 'RuntimeRelay2', '=HH'),
                   ('HeatQuantity_Wh', 'HeatQuantity_kWh', '=HH'),
                   ('HeatQuantity_MWh', 'Version', '=HH')
@@ -71,13 +71,45 @@ class DeltaSol_BS_Plus():
         moving_average.feed(value)
         return moving_average.get_avg()
 
-    def calc_crc(self, buffer):
+    @classmethod
+    def decode_bs_packet(cls, packet):
+        """Decode one complete DeltaSol BS VBus packet without opening a serial port.
+
+        Temperatures are returned in degrees Celsius. This small pure decoder lets
+        recorded controller traffic exercise the protocol in tests.
+        """
+        if len(packet) != 52 or packet[0] != 0xaa:
+            raise ValueError('expected a complete 52-byte VBus packet')
+
+        destination, source, protocol = struct.unpack('=HHB', packet[1:6])
+        command, frame_count, _header_crc = struct.unpack('=HBB', packet[6:10])
+        if (destination, source, protocol, command, frame_count) != (
+            0x0010, 0x4221, V1, 0x0100, 7
+        ):
+            raise ValueError('unsupported VBus packet')
+        if cls.calc_crc(packet[1:10]) != 0:
+            raise ValueError('invalid VBus packet header CRC')
+
+        values = {}
+        for index, definition in enumerate(cls.def_frames):
+            frame = packet[10 + index * 6:16 + index * 6]
+            if cls.calc_crc(frame) != 0:
+                raise ValueError(f'invalid VBus frame CRC at index {index}')
+            decoded = struct.unpack(definition[-1], cls.inject_septett(frame))
+            for key, value in zip(definition[:-1], decoded):
+                values[key] = round(value * 0.1, 1) if key.startswith('S') and len(key) == 2 else value
+
+        return values
+
+    @staticmethod
+    def calc_crc(buffer):
         Crc = 0x7F
         for char in buffer:
             Crc = (Crc - char) & 0x7F
         return Crc
 
-    def inject_septett(self, buffer):
+    @staticmethod
+    def inject_septett(buffer):
         septett = buffer[4]
         return bytes([
             buffer[0] | 0x80 if septett & 1 else buffer[0],
