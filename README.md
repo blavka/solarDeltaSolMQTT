@@ -45,6 +45,12 @@ Update /etc/solarDeltaSolMQTT.yml and run
 solarDeltaSolMQTT -c /etc/solarDeltaSolMQTT.yml
 ```
 
+## Home Assistant MQTT Discovery
+
+Set `home_assistant.enabled: true` in the local configuration. The service retains discovery configuration under `homeassistant/.../config` and retains its state messages. Home Assistant consumes the existing `solar/...` telemetry state topics; no parallel Home Assistant-only temperature topics are created.
+
+Published entities are four temperature sensors, two relay-speed sensors, and two read-only relay-state binary sensors. The latter are derived from bits 0 and 1 of the controller `Relaymask`; the raw mask is not exposed as an HA entity. Availability is published to `solar/availability` and has an MQTT last-will of `offline`.
+
 ## Docker deployment
 
 Docker Compose is the supported deployment method. It uses host networking solely to reach the local Mosquitto listener on `127.0.0.1:1883`; it does not expose a service port. The controller is mapped by stable USB identifier rather than a volatile `/dev/ttyUSB<n>` name.

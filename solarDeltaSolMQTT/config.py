@@ -22,6 +22,11 @@ DEFAULT = {
         'host': '127.0.0.1',
         'port': 1883,
         'prefix': 'solar'
+    },
+    'home_assistant': {
+        'enabled': False,
+        'discovery_prefix': 'homeassistant',
+        'device_name': 'DeltaSol'
     }
 }
 
@@ -50,7 +55,12 @@ schema = Schema({
         Optional('certfile'): os.path.exists,
         Optional('keyfile'): os.path.exists,
     },
-    Optional('publish'): {str: Or(str, bool, int)}
+    Optional('publish'): {str: Or(str, bool, int)},
+    Optional('home_assistant'): {
+        Optional('enabled'): bool,
+        Optional('discovery_prefix'): And(str, len),
+        Optional('device_name'): And(str, len),
+    },
 })
 
 

@@ -11,8 +11,13 @@ mqtt:
   port: 1883
   prefix: solar
 
-# Optional legacy topic mapping. Home Assistant MQTT Discovery configuration
-# will be added separately; do not put credentials in this file.
+home_assistant:
+  enabled: true
+  discovery_prefix: homeassistant
+  device_name: DeltaSol
+
+# Optional legacy topic mapping. The Home Assistant Discovery entities reuse
+# these topics for their state, so existing MQTT consumers remain compatible.
 publish:
   S1: collector/temperature
   S2: boiler-bottom/temperature

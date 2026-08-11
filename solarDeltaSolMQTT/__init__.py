@@ -7,6 +7,7 @@ import os
 import sys
 from .mqtt_client import MqttClient
 from .config import load_config
+from .home_assistant import HomeAssistantDiscovery
 from .vbus import DeltaSol_BS_Plus
 
 __version__ = '0.1.0'
@@ -24,9 +25,29 @@ def cli(config_file=None):
         logging.debug('publish %s', publish)
 
         solar = DeltaSol_BS_Plus(**config['solar'])
-
-        mqtt = MqttClient(**config['mqtt'])
+        home_assistant_config = config['home_assistant']
+        home_assistant_enabled = home_assistant_config['enabled']
+        mqtt = MqttClient(
+            **config['mqtt'],
+            will_topic='availability' if home_assistant_enabled else None,
+        )
         mqtt.loop_start()
+        discovery = None
+        if home_assistant_enabled:
+            state_topics = {
+                key: topic
+                for key, topic in (publish or {}).items()
+                if isinstance(topic, str)
+            }
+            discovery = HomeAssistantDiscovery(
+                mqtt,
+                topic_prefix=config['mqtt']['prefix'],
+                discovery_prefix=home_assistant_config['discovery_prefix'],
+                device_name=home_assistant_config['device_name'],
+                state_topics=state_topics,
+            )
+            discovery.publish_discovery()
+            discovery.publish_availability('online')
 
         def on_change(key, value):
             if isinstance(value, float):
@@ -35,6 +56,11 @@ def cli(config_file=None):
                 value = str(value)
 
             logging.info("Change %s %s", key, value)
+
+            if discovery is not None:
+                discovery.publish_value(key, value)
+                if key in discovery._SENSORS or key == 'Relaymask':
+                    return
 
             if publish is None:
                 return mqtt.publish(key, value, use_json=False)

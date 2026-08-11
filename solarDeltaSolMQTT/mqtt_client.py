@@ -10,7 +10,7 @@ import time
 
 class MqttClient:
 
-    def __init__(self, host, port, username=None, password=None, cafile=None, certfile=None, keyfile=None, prefix=None):
+    def __init__(self, host, port, username=None, password=None, cafile=None, certfile=None, keyfile=None, prefix=None, will_topic=None):
         port = int(port)
 
         self.mqttc = paho.mqtt.client.Client(
@@ -20,6 +20,11 @@ class MqttClient:
         self.mqttc.on_message = self._mqtt_on_message
         self.mqttc.on_disconnect = self._mqtt_on_disconnect
         self.prefix = prefix.rstrip('/') + '/' if prefix else None
+
+        if will_topic:
+            self.mqttc.will_set(
+                self._format_topic(will_topic), "offline", qos=1, retain=True
+            )
 
         self.on_message = None
 
@@ -63,12 +68,16 @@ class MqttClient:
     def _mqtt_on_message(self, client, userdata, message):
         logging.debug('mqtt_on_message %s %s', message.topic, message.payload)
 
-    def publish(self, topic, payload=None, qos=1, use_json=True):
-        self.loop_start()
+    def _format_topic(self, topic, *, prefix=True):
         if isinstance(topic, list):
             topic = '/'.join(topic)
-        if self.prefix:
-            topic = self.prefix + topic
+        if prefix and self.prefix:
+            return self.prefix + topic
+        return topic
+
+    def publish(self, topic, payload=None, qos=1, use_json=True, retain=False, prefix=True):
+        self.loop_start()
+        topic = self._format_topic(topic, prefix=prefix)
         if use_json:
             payload = json.dumps(payload, use_decimal=True)
-        return self.mqttc.publish(topic, payload, qos=qos)
+        return self.mqttc.publish(topic, payload, qos=qos, retain=retain)
