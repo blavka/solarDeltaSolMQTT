@@ -38,7 +38,7 @@ schema = Schema({
     'solar': {
         'device': And(str, len),
         Optional('temperature_diff'): And(float, lambda x: 0 <= x <= 100),
-        Optional('temperature_avg_samples'): And(float, lambda x: 1 <= x <= 100),
+        Optional('temperature_avg_samples'): And(int, lambda x: 1 <= x <= 100),
     },
     Optional('mqtt'): {
         Optional('host'): And(str, len),

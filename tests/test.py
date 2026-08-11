@@ -24,6 +24,7 @@ solar:
         fd = io.StringIO("""
 solar:
   device: /dev/ttyUSB0
+  temperature_avg_samples: 8
 mqtt:
   host: 192.168.0.1
   port: 1990
