@@ -68,6 +68,19 @@ class HomeAssistantDiscovery:
                 payload["device_class"] = device_class
             self._publish_discovery("sensor", object_id, payload)
 
+        self._publish_discovery(
+            "sensor",
+            "status",
+            {
+                "name": "Status",
+                "unique_id": "solar_deltasol_status",
+                "state_topic": self._topic("availability"),
+                "entity_category": "diagnostic",
+                "icon": "mdi:information-outline",
+                "device": self._device,
+            },
+        )
+
         for relay in (1, 2):
             self._publish_discovery(
                 "binary_sensor",

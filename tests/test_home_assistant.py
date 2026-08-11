@@ -35,6 +35,14 @@ class HomeAssistantDiscoveryTests(TestCase):
         self.assertEqual(relay_call.args[1]["state_topic"], "solar/relay-1/state")
         self.assertEqual(relay_call.args[1]["payload_on"], "ON")
 
+        status_call = next(
+            call
+            for call in self.mqtt.publish.call_args_list
+            if call.args[0] == "homeassistant/sensor/solar_deltasol/status/config"
+        )
+        self.assertEqual(status_call.args[1]["state_topic"], "solar/availability")
+        self.assertEqual(status_call.args[1]["entity_category"], "diagnostic")
+
     def test_reuses_existing_sensor_topics_and_derives_relay_states(self):
         self.discovery.publish_value("S1", "66.3")
         self.discovery.publish_value("SpeedRelay2", "100")
