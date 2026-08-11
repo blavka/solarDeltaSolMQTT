@@ -51,6 +51,8 @@ Docker Compose is the supported deployment method. It uses host networking solel
 
 ```sh
 cp config/config.example.yaml config/local.yaml
+sudo chown root:10002 config/local.yaml
+sudo chmod 640 config/local.yaml
 DIALOUT_GID=$(getent group dialout | cut -d: -f3)
 printf 'DIALOUT_GID=%s\n' "$DIALOUT_GID" > .env
 docker compose up -d --build
