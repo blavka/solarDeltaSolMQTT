@@ -1,6 +1,6 @@
 # Solar controller DeltaSol® BS series MQTT
 
-[![Travis](https://travis-ci.org/blavka/solarDeltaSolMQTT.svg?branch=master)](https://travis-ci.org/blavka/solarDeltaSolMQTT)
+[![Tests](https://github.com/blavka/solarDeltaSolMQTT/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/blavka/solarDeltaSolMQTT/actions/workflows/test.yml)
 [![Release](https://img.shields.io/github/release/blavka/solarDeltaSolMQTT.svg)](https://github.com/blavka/solarDeltaSolMQTT/releases)
 [![License](https://img.shields.io/github/license/blavka/solarDeltaSolMQTT.svg)](https://github.com/blavka/solarDeltaSolMQTT/blob/master/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/solarDeltaSolMQTT.svg)](https://pypi.org/project/solarDeltaSolMQTT)

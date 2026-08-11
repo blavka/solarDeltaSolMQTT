@@ -1,4 +1,0 @@
-# CI moved to GitHub Actions (.github/workflows/test.yml).
-# This file deliberately has no deployment credentials.
-language: minimal
-script: true
