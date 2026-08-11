@@ -45,57 +45,33 @@ Update /etc/solarDeltaSolMQTT.yml and run
 solarDeltaSolMQTT -c /etc/solarDeltaSolMQTT.yml
 ```
 
-## Systemd
+## Docker deployment
 
-Insert this snippet to the file /etc/systemd/system/solarDeltaSolMQTT.service:
-
-```
-[Unit]
-Description=solarDeltaSolMQTT
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-ExecStart=/usr/local/bin/solarDeltaSolMQTT -c /etc/solarDeltaSolMQTT.yml
-Restart=always
-RestartSec=5
-StartLimitIntervalSec=0
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable the service start on boot:
+Docker Compose is the supported deployment method. It uses host networking solely to reach the local Mosquitto listener on `127.0.0.1:1883`; it does not expose a service port. The controller is mapped by stable USB identifier rather than a volatile `/dev/ttyUSB<n>` name.
 
 ```sh
-sudo systemctl enable solarDeltaSolMQTT.service
+cp config/config.example.yaml config/local.yaml
+DIALOUT_GID=$(getent group dialout | cut -d: -f3)
+printf 'DIALOUT_GID=%s\n' "$DIALOUT_GID" > .env
+docker compose up -d --build
 ```
 
-Start the service:
+The container is deliberately restricted: it runs as an unprivileged user, has no Linux capabilities, uses a read-only filesystem, and receives only the DeltaSol USB serial device. It reads VBus traffic; it does not send controller commands.
+
+Check the running service with:
 
 ```sh
-sudo systemctl start solarDeltaSolMQTT.service
-```
-
-View the service log:
-
-```sh
-journalctl -u solarDeltaSolMQTT.service -f
-```
-
-## PM2
-
-```sh
-pm2 start /usr/bin/python3 --name "solarDeltaSolMQTT" -- /usr/local/bin/solarDeltaSolMQTT -c /etc/solarDeltaSolMQTT.yml
-pm2 save
+docker compose ps
+docker compose logs -f solar-deltasol-mqtt
 ```
 
 ## Development
 
-```
+```sh
 git clone git@github.com:blavka/solarDeltaSolMQTT.git
 cd solarDeltaSolMQTT
-./test.sh
-sudo python3 setup.py develop
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+python -m unittest discover -s tests -v
 ```

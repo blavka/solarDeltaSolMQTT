@@ -1,0 +1,19 @@
+services:
+  solar-deltasol-mqtt:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    devices:
+      - /dev/serial/by-id/usb-Prolific_Technology_Inc._USB-Serial_Controller-if00-port0:/dev/deltasol:rw
+    group_add:
+      - "${DIALOUT_GID:?Set DIALOUT_GID in .env}"
+    volumes:
+      - ./config/local.yaml:/config/config.yml:ro
+    command: ["--config", "/config/config.yml"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

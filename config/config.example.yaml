@@ -1,0 +1,23 @@
+# Copy this file to config/local.yaml. The local file is intentionally ignored by Git.
+solar:
+  # Container device name; compose maps the stable USB-by-id path to it.
+  device: /dev/deltasol
+  temperature_diff: 0.2
+  temperature_avg_samples: 8
+
+mqtt:
+  # Host networking is used so this reaches the local UniPi Mosquitto listener.
+  host: 127.0.0.1
+  port: 1883
+  prefix: solar
+
+# Optional legacy topic mapping. Home Assistant MQTT Discovery configuration
+# will be added separately; do not put credentials in this file.
+publish:
+  S1: collector/temperature
+  S2: boiler-bottom/temperature
+  S3: boiler-top/temperature
+  S4: return/temperature
+  SpeedRelay1: relay-1/speed
+  SpeedRelay2: relay-2/speed
+  Errormask: error-mask
