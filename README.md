@@ -51,6 +51,21 @@ Set `home_assistant.enabled: true` in the local configuration. The service retai
 
 Published entities are four temperature sensors, two relay-speed sensors, and two read-only relay-state binary sensors. The latter are derived from bits 0 and 1 of the controller `Relaymask`; the raw mask is not exposed as an HA entity. Availability is published to `solar/availability` and has an MQTT last-will of `offline`.
 
+
+## Overtemperature e-mail alert
+
+`scripts/solar_collector_overtemperature_alert.py` is an optional, dependency-free watchdog for a Home Assistant installation. It reads a Home Assistant entity through the REST API and sends one e-mail per temperature excursion with the locally configured Himalaya account. It is intentionally separate from the telemetry container, so DeltaSol collection remains read-only and continues if e-mail delivery fails.
+
+Required environment variables:
+
+```sh
+HOMEASSISTANT_URL=http://homeassistant.local:8123
+HOMEASSISTANT_TOKEN=<long-lived-access-token>
+SOLAR_ALERT_RECIPIENT=operator@example.invalid
+```
+
+Optional variables: `SOLAR_ALERT_ENTITY` (default `sensor.deltasol_collector_temperature`), `SOLAR_ALERT_TRIGGER_C` (default `90`), `SOLAR_ALERT_REARM_C` (default `89`), `SOLAR_ALERT_HIMALAYA_ACCOUNT` (default `hermes_gmail`), and `SOLAR_ALERT_STATE_FILE`. The state file suppresses duplicate e-mails while the temperature remains over the threshold; the alert is rearmed at or below the rearm temperature. Run it once per minute from a systemd timer or cron.
+
 ## Docker deployment
 
 Docker Compose is the supported deployment method. It uses host networking solely to reach the local Mosquitto listener on `127.0.0.1:1883`; it does not expose a service port. The controller is mapped by stable USB identifier rather than a volatile `/dev/ttyUSB<n>` name.
