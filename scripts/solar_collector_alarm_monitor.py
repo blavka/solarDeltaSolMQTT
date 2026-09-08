@@ -69,19 +69,29 @@ def main() -> int:
         return 0
 
     collector = os.environ.get("SOLAR_ALERT_ENTITY", "sensor.deltasol_collector_temperature")
+    deltasol_status_entity = os.environ.get("SOLAR_ALERT_DELTASOL_STATUS_ENTITY", "sensor.deltasol_status")
     trigger = float(os.environ.get("SOLAR_ALERT_TRIGGER_C", "90"))
     rearm = float(os.environ.get("SOLAR_ALERT_REARM_C", "89"))
     outlets = [x.strip() for x in os.environ.get("SOLAR_ALERT_MATTER_ENTITIES", "switch.zasuvka_01,switch.zasuvka_02").split(",") if x.strip()]
+
     try:
-        temperature = float(get_state(url, token, collector))
-        prior = read_solar_state()
-        solar = "active" if temperature > trigger else "clear" if temperature <= rearm else prior
-        write_solar_state(solar)
+        deltasol_status = get_state(url, token, deltasol_status_entity)
+        if deltasol_status != "online":
+            solar = "unavailable"
+        else:
+            temperature = float(get_state(url, token, collector))
+            prior = read_solar_state()
+            solar = "active" if temperature > trigger else "clear" if temperature <= rearm else prior
+            write_solar_state(solar)
+    except (RuntimeError, ValueError, OSError):
+        solar = "unavailable"
+
+    try:
         outlet_states = [get_state(url, token, entity) for entity in outlets]
         matter = "unavailable" if any(state in {"unavailable", "unknown"} for state in outlet_states) else "ok"
-        print(f"solar={solar} matter={matter}")
-    except (RuntimeError, ValueError, OSError):
-        print("solar=invalid matter=unknown")
+    except RuntimeError:
+        matter = "unknown"
+    print(f"solar={solar} matter={matter}")
     return 0
 
 
