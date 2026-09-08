@@ -66,6 +66,9 @@ SOLAR_ALERT_RECIPIENT=operator@example.invalid
 
 Optional variables: `SOLAR_ALERT_ENTITY` (default `sensor.deltasol_collector_temperature`), `SOLAR_ALERT_TRIGGER_C` (default `90`), `SOLAR_ALERT_REARM_C` (default `89`), `SOLAR_ALERT_HIMALAYA_ACCOUNT` (default `hermes_gmail`), and `SOLAR_ALERT_STATE_FILE`. The state file suppresses duplicate e-mails while the temperature remains over the threshold; the alert is rearmed at or below the rearm temperature. Run it once per minute from a systemd timer or cron.
 
+
+For a supervisor that should invoke an external agent only on meaningful changes, use `scripts/solar_collector_alarm_monitor.py` instead. It emits a stable `solar=<clear|active|invalid> matter=<ok|unavailable|unknown>` line and deliberately does not send e-mail itself. A hash-based scheduler can use that output to launch an agent only when a high-temperature condition, Home Assistant telemetry failure, or configured Matter-outlet availability changes. Set `SOLAR_ALERT_MATTER_ENTITIES` to a comma-separated list of critical HA switches; it defaults to `switch.zasuvka_01,switch.zasuvka_02`.
+
 ## Docker deployment
 
 Docker Compose is the supported deployment method. It uses host networking solely to reach the local Mosquitto listener on `127.0.0.1:1883`; it does not expose a service port. The controller is mapped by stable USB identifier rather than a volatile `/dev/ttyUSB<n>` name.
