@@ -14,8 +14,9 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-ENV_FILE = Path(os.environ.get("SOLAR_ALERT_ENV_FILE", Path.home() / ".hermes/.env"))
-STATE_FILE = Path(os.environ.get("SOLAR_ALERT_MONITOR_STATE_FILE", Path.home() / ".local/state/solar-collector-monitor.json"))
+_RUNTIME_HOME = Path(os.environ.get("HERMES_REAL_HOME", Path.home()))
+ENV_FILE = Path(os.environ.get("SOLAR_ALERT_ENV_FILE", _RUNTIME_HOME / ".hermes/.env"))
+STATE_FILE = Path(os.environ.get("SOLAR_ALERT_MONITOR_STATE_FILE", _RUNTIME_HOME / ".local/state/solar-collector-monitor.json"))
 
 
 def load_dotenv(path: Path) -> None:
