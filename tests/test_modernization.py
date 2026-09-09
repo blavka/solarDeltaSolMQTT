@@ -64,3 +64,52 @@ class TestModernization(TestCase):
                 "Version": 100,
             },
         )
+
+    @patch("solarDeltaSolMQTT.vbus.serial.Serial")
+    def test_loop_publishes_only_a_complete_valid_packet(self, serial_class):
+        packet = bytes.fromhex(
+            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
+            "113491c0a26056532015803007151006400004a"
+        )
+        connection = MagicMock()
+        connection.read.side_effect = [
+            b"\xaa", packet[1:6], packet[6:10], packet[10:], KeyboardInterrupt()
+        ]
+        serial_class.return_value = connection
+        controller = DeltaSol_BS_Plus("/dev/null", temperature_avg_samples=1)
+        changes = []
+        controller.on_change = lambda key, value: changes.append((key, value))
+
+        with self.assertRaises(KeyboardInterrupt):
+            controller.loop_forever()
+
+        self.assertEqual(controller.S1, 65.9)
+        self.assertEqual(controller.SpeedRelay2, 100)
+        self.assertIn(("S1", 65.9), changes)
+
+    @patch("solarDeltaSolMQTT.vbus.serial.Serial")
+    @patch("solarDeltaSolMQTT.vbus.time.time", return_value=11)
+    def test_loop_drops_invalid_packet_without_publishing_fields(self, _time, serial_class):
+        packet = bytearray(bytes.fromhex(
+            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
+            "113491c0a26056532015803007151006400004a"
+        ))
+        packet[20] ^= 1
+        connection = MagicMock()
+        connection.read.side_effect = [
+            b"\xaa", bytes(packet[1:6]), bytes(packet[6:10]), bytes(packet[10:]), b""
+        ]
+        serial_class.return_value = connection
+        controller = DeltaSol_BS_Plus(
+            "/dev/null", temperature_avg_samples=1, communication_timeout_seconds=10
+        )
+        controller.lastPacket = 0
+        changes = []
+        controller.on_change = lambda key, value: changes.append((key, value))
+
+        with self.assertRaisesRegex(Exception, "Broken communication"):
+            controller.loop_forever()
+
+        self.assertEqual(changes, [])
+        self.assertIsNone(controller.S1)
+        self.assertIsNone(controller.SpeedRelay2)

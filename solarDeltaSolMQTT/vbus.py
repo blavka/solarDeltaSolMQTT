@@ -25,9 +25,11 @@ class DeltaSol_BS_Plus():
                   ('HeatQuantity_MWh', 'Version', '=HH')
                   )
 
-    def __init__(self, device, temperature_diff=0.2, temperature_avg_samples=5):
+    def __init__(self, device, temperature_diff=0.2, temperature_avg_samples=5,
+                 communication_timeout_seconds=30):
         self._device = device
         self.temperature_diff = temperature_diff
+        self.communication_timeout_seconds = communication_timeout_seconds
         self._conn = None
 
         self._names = []
@@ -117,61 +119,68 @@ class DeltaSol_BS_Plus():
             buffer[2] | 0x80 if septett & 4 else buffer[2],
             buffer[3] | 0x80 if septett & 8 else buffer[3]])
 
+    def apply_decoded_values(self, values):
+        """Publish a fully validated controller packet as one atomic update.
+
+        VBus serial noise can produce bytes that resemble individual frames.
+        Never publish any field until the header and every frame in the expected
+        packet have passed CRC validation.
+        """
+        for key, value in values.items():
+            old = getattr(self, key)
+            is_temperature = key.startswith('S') and len(key) == 2
+            if is_temperature:
+                moving_average = getattr(self, key + '_ma')
+                moving_average.feed(value)
+                value = moving_average.get_avg()
+
+            logging.debug("key=%s value=%s old=%s", key, value, old)
+            if old == value:
+                continue
+            if is_temperature and old is not None and abs(old - value) < self.temperature_diff:
+                continue
+            if callable(self.on_change):
+                self.on_change(key, value)
+            setattr(self, key, value)
+
     def loop_forever(self):
         self._conn = serial.Serial(self._device, baudrate=9600, timeout=3.0)
 
-        while 1:
-            d = self._conn.read(1)
-            if d == b'\xaa':
-                # print("====MESS====")
-                head_data = self._conn.read(5)
-                destination_address, source_address, protocol_version = struct.unpack(
-                    '=HHB', head_data)
-                # print( destination_address, source_address, protocol_version )
-                if protocol_version == V1:
-                    head_data2 = self._conn.read(4)
-                    command, frame_count, header_CRC = struct.unpack(
-                        '=HBB', head_data2)
-                    if self.calc_crc(head_data + head_data2) != 0:
-                        continue
-
-                    ts = int(time.time() * 1000)
-
-                    if destination_address == 0x0010 and source_address == 0x4221 and command == 0x0100:
-                        for i in range(frame_count):
-                            frame_data = self._conn.read(6)
-                            if self.calc_crc(frame_data) != 0:
-                                break
-                            data = self.inject_septett(frame_data)
-                            def_frame = self.def_frames[i]
-                            unpack_data = struct.unpack(def_frame[-1], data)
-                            for j in range(len(def_frame) - 1):
-                                key = def_frame[j]
-                                value = unpack_data[j]
-                                old = self.__dict__.get(key, None)
-
-                                is_temperature = key[0] == 'S' and len(key) == 2
-                                value = self.normalize_value(key, value)
-
-                                logging.debug(
-                                    "key=%s value=%s old=%s", key, value, old)
-
-                                if old == value:
-                                    continue
-
-                                if is_temperature and old and abs(old - value) < self.temperature_diff:
-                                    continue
-
-                                if callable(self.on_change):
-                                    self.on_change(key, value)
-
-                                self.__setattr__(key, value)
-
-                    self.lastPacket = ts
-            else:
-                ts = int(time.time() * 1000)
-                if ts - self.lastPacket > 10000:
+        while True:
+            if self._conn.read(1) != b'\xaa':
+                if int(time.time() * 1000) - self.lastPacket > self.communication_timeout_seconds * 1000:
                     raise Exception('Broken communication')
+                continue
+
+            head_data = self._conn.read(5)
+            if len(head_data) != 5:
+                continue
+            destination_address, source_address, protocol_version = struct.unpack('=HHB', head_data)
+            if protocol_version != V1:
+                # V2 packets have a different layout.  Their bytes stay below
+                # the VBus sync marker, so resume scanning for the next packet
+                # instead of consuming the following V1 packet as payload.
+                continue
+
+            head_data2 = self._conn.read(4)
+            if len(head_data2) != 4 or self.calc_crc(head_data + head_data2) != 0:
+                continue
+            command, frame_count, _header_crc = struct.unpack('=HBB', head_data2)
+            frame_data = self._conn.read(frame_count * 6)
+            if len(frame_data) != frame_count * 6:
+                continue
+            if (destination_address, source_address, command, frame_count) != (0x0010, 0x4221, 0x0100, 7):
+                continue
+
+            try:
+                values = self.decode_bs_packet(b'\xaa' + head_data + head_data2 + frame_data)
+            except ValueError:
+                # Ignore malformed traffic.  Crucially, do not refresh
+                # lastPacket: a sustained bad stream remains unhealthy.
+                continue
+
+            self.apply_decoded_values(values)
+            self.lastPacket = int(time.time() * 1000)
 
     def get_all_values(self):
         return {k: self.__dict__[k] for k in self._names}
