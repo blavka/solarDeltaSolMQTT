@@ -113,3 +113,27 @@ class TestModernization(TestCase):
         self.assertEqual(changes, [])
         self.assertIsNone(controller.S1)
         self.assertIsNone(controller.SpeedRelay2)
+
+
+    @patch("solarDeltaSolMQTT.vbus.serial.Serial")
+    def test_loop_restarts_after_three_consecutive_bad_packet_crcs(self, serial_class):
+        packet = bytearray(bytes.fromhex(
+            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
+            "113491c0a26056532015803007151006400004a"
+        ))
+        packet[20] ^= 1
+        connection = MagicMock()
+        connection.read.side_effect = sum((
+            [b"\xaa", bytes(packet[1:6]), bytes(packet[6:10]), bytes(packet[10:])]
+            for _ in range(3)
+        ), [])
+        serial_class.return_value = connection
+        controller = DeltaSol_BS_Plus("/dev/null", temperature_avg_samples=1)
+
+        with self.assertLogs(level="WARNING") as logs:
+            with self.assertRaisesRegex(Exception, "3 consecutive invalid VBus packets"):
+                controller.loop_forever()
+
+        self.assertIn("consecutive failures: 1/3", logs.output[0])
+        self.assertIn("consecutive failures: 3/3", logs.output[2])
+        self.assertEqual(controller.invalid_packet_count, 3)

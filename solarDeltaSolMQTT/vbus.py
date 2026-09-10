@@ -59,6 +59,7 @@ class DeltaSol_BS_Plus():
         self.Version = None
 
         self.lastPacket = int(time.time() * 1000)
+        self.invalid_packet_count = 0
 
         self.on_change = None
 
@@ -143,6 +144,22 @@ class DeltaSol_BS_Plus():
                 self.on_change(key, value)
             setattr(self, key, value)
 
+    def record_invalid_packet(self, reason):
+        """Log corrupt target traffic and restart only after a short streak.
+
+        A valid packet resets this counter. Short reads and missing traffic use the
+        separate time-based watchdog, because they do not establish a CRC failure.
+        """
+        self.invalid_packet_count += 1
+        logging.warning(
+            "Invalid VBus packet (%s); consecutive failures: %d/3",
+            reason, self.invalid_packet_count
+        )
+        if self.invalid_packet_count >= 3:
+            raise Exception(
+                "Broken communication after 3 consecutive invalid VBus packets: " + reason
+            )
+
     def loop_forever(self):
         self._conn = serial.Serial(self._device, baudrate=9600, timeout=3.0)
 
@@ -163,7 +180,10 @@ class DeltaSol_BS_Plus():
                 continue
 
             head_data2 = self._conn.read(4)
-            if len(head_data2) != 4 or self.calc_crc(head_data + head_data2) != 0:
+            if len(head_data2) != 4:
+                continue
+            if self.calc_crc(head_data + head_data2) != 0:
+                self.record_invalid_packet("header CRC")
                 continue
             command, frame_count, _header_crc = struct.unpack('=HBB', head_data2)
             frame_data = self._conn.read(frame_count * 6)
@@ -174,11 +194,12 @@ class DeltaSol_BS_Plus():
 
             try:
                 values = self.decode_bs_packet(b'\xaa' + head_data + head_data2 + frame_data)
-            except ValueError:
-                # Ignore malformed traffic.  Crucially, do not refresh
-                # lastPacket: a sustained bad stream remains unhealthy.
+            except ValueError as exc:
+                # Do not refresh lastPacket: a sustained bad stream remains unhealthy.
+                self.record_invalid_packet(str(exc))
                 continue
 
+            self.invalid_packet_count = 0
             self.apply_decoded_values(values)
             self.lastPacket = int(time.time() * 1000)
 
