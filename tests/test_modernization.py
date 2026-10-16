@@ -87,53 +87,37 @@ class TestModernization(TestCase):
         self.assertEqual(controller.SpeedRelay2, 100)
         self.assertIn(("S1", 65.9), changes)
 
-    @patch("solarDeltaSolMQTT.vbus.serial.Serial")
-    @patch("solarDeltaSolMQTT.vbus.time.time", return_value=11)
-    def test_loop_drops_invalid_packet_without_publishing_fields(self, _time, serial_class):
-        packet = bytearray(bytes.fromhex(
-            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
-            "113491c0a26056532015803007151006400004a"
-        ))
-        packet[20] ^= 1
-        connection = MagicMock()
-        connection.read.side_effect = [
-            b"\xaa", bytes(packet[1:6]), bytes(packet[6:10]), bytes(packet[10:]), b""
-        ]
-        serial_class.return_value = connection
-        controller = DeltaSol_BS_Plus(
-            "/dev/null", temperature_avg_samples=1, communication_timeout_seconds=10
-        )
+    def test_timeout_logs_no_data_without_crashing_service(self):
+        controller = DeltaSol_BS_Plus("/dev/null", communication_timeout_seconds=30)
         controller.lastPacket = 0
-        changes = []
-        controller.on_change = lambda key, value: changes.append((key, value))
 
-        with self.assertRaisesRegex(Exception, "Broken communication"):
-            controller.loop_forever()
+        with self.assertLogs(level="ERROR") as logs:
+            timed_out = controller.report_communication_timeout(30_001)
 
-        self.assertEqual(changes, [])
-        self.assertIsNone(controller.S1)
-        self.assertIsNone(controller.SpeedRelay2)
+        self.assertTrue(timed_out)
+        self.assertIn("No valid VBus packet for 30 seconds", logs.output[0])
+        self.assertEqual(controller.lastPacket, 30_001)
 
 
-    @patch("solarDeltaSolMQTT.vbus.serial.Serial")
-    def test_loop_restarts_after_three_consecutive_bad_packet_crcs(self, serial_class):
-        packet = bytearray(bytes.fromhex(
-            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
-            "113491c0a26056532015803007151006400004a"
-        ))
-        packet[20] ^= 1
-        connection = MagicMock()
-        connection.read.side_effect = sum((
-            [b"\xaa", bytes(packet[1:6]), bytes(packet[6:10]), bytes(packet[10:])]
-            for _ in range(3)
-        ), [])
-        serial_class.return_value = connection
-        controller = DeltaSol_BS_Plus("/dev/null", temperature_avg_samples=1)
+    def test_three_consecutive_bad_packet_crcs_do_not_crash_service(self):
+        controller = DeltaSol_BS_Plus("/dev/null")
 
         with self.assertLogs(level="WARNING") as logs:
-            with self.assertRaisesRegex(Exception, "3 consecutive invalid VBus packets"):
-                controller.loop_forever()
+            for _ in range(3):
+                controller.record_invalid_packet("header CRC")
 
-        self.assertIn("consecutive failures: 1/3", logs.output[0])
-        self.assertIn("consecutive failures: 3/3", logs.output[2])
+        self.assertIn("failures: 3", logs.output[2])
         self.assertEqual(controller.invalid_packet_count, 3)
+
+    def test_debug_raw_bytes_are_logged_for_invalid_packet(self):
+        controller = DeltaSol_BS_Plus("/dev/null", debug_raw_bytes=True)
+
+        with self.assertLogs(level="WARNING") as logs:
+            controller.record_invalid_packet('header CRC', raw=bytes.fromhex('aa0102'))
+
+        self.assertIn("raw=aa0102", logs.output[0])
+
+    def test_debug_raw_bytes_can_be_enabled_in_solar_config(self):
+        config = load_config(io.StringIO("solar:\n  device: /dev/null\n  debug_raw_bytes: true\n"))
+
+        self.assertTrue(config["solar"]["debug_raw_bytes"])

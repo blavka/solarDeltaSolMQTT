@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     network_mode: host
     devices:
-      - /dev/serial/by-hub/port-1:/dev/deltasol:rw
+      - /dev/ttyUSB3:/dev/deltasol:rw
     group_add:
       - "${DIALOUT_GID:?Set DIALOUT_GID in .env}"
     volumes:

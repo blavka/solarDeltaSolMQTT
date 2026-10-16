@@ -16,7 +16,8 @@ from schema import Schema, And, Or, Use, Optional, SchemaError
 DEFAULT = {
     'solar': {
         'temperature_diff': 0.2,
-        'temperature_avg_samples': 8
+        'temperature_avg_samples': 8,
+        'debug_raw_bytes': False
     },
     'mqtt': {
         'host': '127.0.0.1',
@@ -44,6 +45,7 @@ schema = Schema({
         'device': And(str, len),
         Optional('temperature_diff'): And(float, lambda x: 0 <= x <= 100),
         Optional('temperature_avg_samples'): And(int, lambda x: 1 <= x <= 100),
+        Optional('debug_raw_bytes'): bool,
     },
     Optional('mqtt'): {
         Optional('host'): And(str, len),

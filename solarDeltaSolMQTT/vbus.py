@@ -26,10 +26,11 @@ class DeltaSol_BS_Plus():
                   )
 
     def __init__(self, device, temperature_diff=0.2, temperature_avg_samples=5,
-                 communication_timeout_seconds=30):
+                 communication_timeout_seconds=30, debug_raw_bytes=False):
         self._device = device
         self.temperature_diff = temperature_diff
         self.communication_timeout_seconds = communication_timeout_seconds
+        self.debug_raw_bytes = debug_raw_bytes
         self._conn = None
 
         self._names = []
@@ -144,29 +145,28 @@ class DeltaSol_BS_Plus():
                 self.on_change(key, value)
             setattr(self, key, value)
 
-    def record_invalid_packet(self, reason):
-        """Log corrupt target traffic and restart only after a short streak.
-
-        A valid packet resets this counter. Short reads and missing traffic use the
-        separate time-based watchdog, because they do not establish a CRC failure.
-        """
+    def record_invalid_packet(self, reason, raw=None):
+        """Log corrupt traffic; only valid packets refresh communication liveness."""
         self.invalid_packet_count += 1
-        logging.warning(
-            "Invalid VBus packet (%s); consecutive failures: %d/3",
-            reason, self.invalid_packet_count
-        )
-        if self.invalid_packet_count >= 3:
-            raise Exception(
-                "Broken communication after 3 consecutive invalid VBus packets: " + reason
-            )
+        if self.debug_raw_bytes and raw is not None:
+            logging.warning("Invalid VBus packet (%s); failures: %d; raw=%s", reason, self.invalid_packet_count, raw.hex())
+        else:
+            logging.warning("Invalid VBus packet (%s); failures: %d", reason, self.invalid_packet_count)
+
+    def report_communication_timeout(self, now_ms):
+        """Log an outage once per timeout interval without stopping telemetry."""
+        if now_ms - self.lastPacket <= self.communication_timeout_seconds * 1000:
+            return False
+        logging.error("No valid VBus packet for %s seconds", self.communication_timeout_seconds)
+        self.lastPacket = now_ms
+        return True
 
     def loop_forever(self):
         self._conn = serial.Serial(self._device, baudrate=9600, timeout=3.0)
 
         while True:
             if self._conn.read(1) != b'\xaa':
-                if int(time.time() * 1000) - self.lastPacket > self.communication_timeout_seconds * 1000:
-                    raise Exception('Broken communication')
+                self.report_communication_timeout(int(time.time() * 1000))
                 continue
 
             head_data = self._conn.read(5)
@@ -183,7 +183,7 @@ class DeltaSol_BS_Plus():
             if len(head_data2) != 4:
                 continue
             if self.calc_crc(head_data + head_data2) != 0:
-                self.record_invalid_packet("header CRC")
+                self.record_invalid_packet("header CRC", raw=bytes([0xaa]) + head_data + head_data2)
                 continue
             command, frame_count, _header_crc = struct.unpack('=HBB', head_data2)
             frame_data = self._conn.read(frame_count * 6)
@@ -196,7 +196,7 @@ class DeltaSol_BS_Plus():
                 values = self.decode_bs_packet(b'\xaa' + head_data + head_data2 + frame_data)
             except ValueError as exc:
                 # Do not refresh lastPacket: a sustained bad stream remains unhealthy.
-                self.record_invalid_packet(str(exc))
+                self.record_invalid_packet(str(exc), raw=bytes([0xaa]) + head_data + head_data2 + frame_data)
                 continue
 
             self.invalid_packet_count = 0
