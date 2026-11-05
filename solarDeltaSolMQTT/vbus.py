@@ -16,8 +16,9 @@ V2 = 0x20
 
 class DeltaSol_BS_Plus():
 
-    def_frames = (('S1', 'S2', '=HH'),
-                  ('S3', 'S4', '=HH'),
+    # DeltaSol VBus temperatures are signed 16-bit values in tenths of °C.
+    def_frames = (('S1', 'S2', '=hh'),
+                  ('S3', 'S4', '=hh'),
                   ('SpeedRelay1', 'SpeedRelay2', 'Relaymask', 'Errormask', '=BBBB'),
                   ('SystemTime', 'Scheme', 'OptionsMask', '=HBB'),
                   ('RuntimeRelay1', 'RuntimeRelay2', '=HH'),

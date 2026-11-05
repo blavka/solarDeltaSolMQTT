@@ -1,4 +1,5 @@
 import io
+import struct
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
@@ -33,6 +34,22 @@ class TestModernization(TestCase):
         controller = DeltaSol_BS_Plus("/dev/null", temperature_avg_samples=1)
 
         self.assertEqual(controller.normalize_value("S1", 100), 10.0)
+
+    def test_decodes_negative_collector_temperature_as_signed_tenths(self):
+        packet = bytearray(bytes.fromhex(
+            "aa10002142100001077413023a02012d28012e0100271e640300007a650303000"
+            "113491c0a26056532015803007151006400004a"
+        ))
+        raw = struct.pack("=hh", -26, 570)
+        septett = sum((1 << index) for index, value in enumerate(raw) if value & 0x80)
+        frame = bytes(value & 0x7f for value in raw) + bytes([septett])
+        frame += bytes([DeltaSol_BS_Plus.calc_crc(frame)])
+        packet[10:16] = frame
+
+        values = DeltaSol_BS_Plus.decode_bs_packet(bytes(packet))
+
+        self.assertEqual(values["S1"], -2.6)
+        self.assertEqual(values["S2"], 57.0)
 
     def test_decodes_captured_deltasol_bs_vbus_frame_without_serial_hardware(self):
         packet = bytes.fromhex(
